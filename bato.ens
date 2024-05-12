@@ -1,0 +1,447 @@
+TECLAT EQU 0E000h
+PANTALLA EQU 0F000h 
+
+MAX_PUNTS EQU 6
+ 
+ORIGEN 10h 
+ 
+INICIO ini 
+ 
+.DATOS 
+	; Vectors per imprimir la pantalla de tı́tol del joc
+    text_splash_1 VALOR "BATTLESHIP v0.8"
+	text_splash_2 VALOR	"BATTLESHIP v0.8"
+	text_splash_3 VALOR "BATTLESHIP v0.8"
+	text_splash_4 VALOR "BATTLESHIP v0.8"
+	text_splash_5 VALOR "BATTLESHIP v0.8"
+	text_splash_6 VALOR "BATTLESHIP v0.8"
+	text_splash_7 VALOR	"BATTLESHIP v0.8"
+	text_splash_8 VALOR	"BATTLESHIP v0.8"
+	
+	; Vectors per imprimir la graella de joc 
+	graella_horitzontal VALOR "     123456     "
+	graella_vertical VALOR "abcdef"
+	
+	; Vectors per mostrar i desar l'estat del joc
+	; (punts i munici ó actuals)
+	Letras VALOR 'L', '=', ""
+	Numeros VALOR 'N', '=', ""
+	
+	text_coordenades VALOR "ENTRA COORD: "
+	
+	coordenada_x VALOR ' '
+
+	
+	fila_a VALOR 1,1,1,0,0,0 
+	fila_b VALOR 0,0,0,0,0,1 
+	fila_c VALOR 1,0,1,1,0,0 
+	fila_d VALOR 1,0,0,0,0,0 
+	fila_e VALOR 0,0,0,0,0,1 
+	fila_f VALOR 0,0,0,1,0,0 
+	
+	
+	
+.CODIGO 
+ 
+ini:   ;programa principal  
+	
+	; Començem netejant la pantalla per deixar -la tota negra
+	MOVH R0, BYTEALTO DIRECCION netejar_pantalla
+	MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
+	CALL R0 
+		
+	; Mostrem la pantalla inicial 'splash' del programa
+	MOVH R0, BYTEALTO DIRECCION splash 
+	MOVL R0, BYTEBAJO DIRECCION splash 
+	CALL R0
+	
+	; Monitoritzem el teclat fins que l'usuari apreti la 
+	; tecla espai
+	MOVH R0, BYTEALTO DIRECCION esperant_espai 
+	MOVL R0, BYTEBAJO DIRECCION esperant_espai 
+	CALL R0 
+	
+	; Si estem aqui significa que s'ha apretat la tecla 
+	;espai, i el joc ha de començar 
+	
+	; Cridem de nou al procediment per netejar la pantalla 
+	MOVH R0, BYTEALTO DIRECCION netejar_pantalla 
+	MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
+	CALL R0
+	
+	; Ara imprimim la graella inicial de joc
+	MOVH R0, BYTEALTO DIRECCION imprimir_graella
+	MOVL R0, BYTEBAJO DIRECCION imprimir_graella
+	CALL R0
+	
+	torn_jugador:
+		; Imprimim l'estat del joc (punts i munici ó)
+		MOVH R0 , BYTEALTO DIRECCION imprimir_estat_joc 
+		MOVL R0 , BYTEBAJO DIRECCION imprimir_estat_joc 
+		CALL R0
+		
+		; Mostrem el text on es demanen les coordenades al jugador
+		MOVH R0 , BYTEALTO DIRECCION demanar_coordenades 
+		MOVL R0 , BYTEBAJO DIRECCION demanar_coordenades
+		CALL R0
+		
+		;Esperem que l'usuari entri les coordenades per teclat
+		MOVH R0, BYTEALTO DIRECCION esperant_coordenades
+		MOVL R0, BYTEBAJO DIRECCION esperant_coordenades
+		CALL R0
+		JMP -1
+		
+
+
+
+;################################################################################
+
+; Neteja la pantalla , deixant -la tota negra mitjan çant el 
+; registre de control de la pantalla.
+netejar_pantalla: 
+	; Per netejar la pantalla ens cal accedir al registre de
+	; control de la pantalla , situat després de la memoria de 
+	; vı́deo , <ADRE ÇA_BASE > + 120 
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA 
+	MOVH R1, 00h 
+	MOVL R1, 120 
+	ADD R0 , R0 , R1
+	; Mà scara per netejar la pantalla:
+	; Bit 0:
+	; Si aquest bit est à a 1 es fa un reset de la pantalla
+	; Bit 1: 165 
+	; Valor 1 == pantalla encesa
+	; Valor 0 == pantalla apagada 
+	MOVH R1, 00h
+	MOVL R1, 11b
+	MOV [R0], R1
+	RET
+
+; Mostra la pantalla de tı́tol inicial del joc a partir del 
+; que hi ha definit en els vectors de mem. 'text_splash_x ' 
+splash: 
+	; Utilitzem R0 per accedir a la pantalla
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA 
+	; Utilitzem R2 de contador , amb les 120 posicions 
+	; de la pantalla
+	MOVH R2, 00h 
+	MOVL R2, 120
+	; Utilitzem R3 per referenciar el vector a imprimir 
+	MOVH R3, BYTEALTO DIRECCION text_splash_1 
+	MOVL R3, BYTEBAJO DIRECCION text_splash_1 
+	
+	imprimir_titol: 
+		MOV R4 , [R3] 
+		; Llegim el valor de mem òria a imprimir 
+		MOVH R4 , 00110000b ; Establim el format del text a imprimir
+		MOV [R0], R4 ; Enviem a pantalla les dades a imprimir 
+		INC R0 ; Movem a la seg üent posici ó de pantalla 
+		INC R3 ; Movem a la seg üent posici ó del vector 
+		DEC R2 ; Decrementem el contador
+		BRNZ imprimir_titol ; Quan el contador és 0, hem acabat
+	RET
+	
+	; Aquest procediment consulta l'estat del registre de control
+	; del teclat de forma iterativa , i s'acaba quan detecta que
+	; hi ha dades al buffer
+consulta_estat_teclat:
+	; Utilitzem R0 per accedir a l'adre ça base del teclat
+	MOVH R0, BYTEALTO TECLAT 
+	MOVL R0, BYTEBAJO TECLAT 
+	
+	; Incrementem R0 per accedir al registre de control del teclat
+	INC R0
+	
+	; Mà scara per consultar si hi ha dades al buffer del teclat 
+	MOVH R1, 00000001b 
+	MOVL R1, 00h
+
+	consulta_estat: 
+		; Llegim el registre de control del teclat i el guardem a R4 
+		MOV R2,[R0]
+		; Comparem el que obtenim de teclat amb el que esperem trobar 
+		COMP R2, R1 
+		; Si són iguals , vol dir que tenim dades al buffer i podem
+		; procedir a llegir -les , sin ó tornem a consultar l'estat
+		BRNZ consulta_estat
+		RET
+		
+; Aquest procediment s'anir à executant fins que l'usuari apreti
+; la tecla espai 
+esperant_espai: 
+	; Fem una crida al procediment que consulta l'estat del teclat 
+	MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat 
+	MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+	CALL R0 
+	
+	; Si estem aqui significa que s'ha premut alguna tecla del teclat. Ara mirarem quina. 
+	; Inicialitzem el registre R0 al registre de dades del teclat 
+	MOVH R0, BYTEALTO TECLAT
+	MOVL R0, BYTEBAJO TECLAT
+	
+	MOV R1 , [R0] ; Llegim el car àcter que hi ha al buffer
+	
+	; A R0 posem el codi rastreig/ASCII de l'espai
+	MOVH R0, 32h
+	MOVL R0, 20h
+	; Comparem les dades llegides de teclat amb el codi de l'espai
+	COMP R1, R0
+	; Si no són iguals (resultat != 0), tornem a consultar l'estat
+	BRNZ esperant_espai 
+	; Si són iguals , retornem del procediment 
+	RET
+
+imprimir_graella:
+	; Utilitzem R0 per accedir a la pantalla
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA 
+	; R2 s'usa de contador , amb les 15 columnes que té la pantalla
+	MOVH R2, 00h  
+	MOVL R2, 15
+	; Utilitzem R3 per referenciar el vector a imprimir
+	MOVH R3, BYTEALTO DIRECCION graella_horitzontal
+	MOVL R3, BYTEBAJO DIRECCION graella_horitzontal 
+	
+	imprimir_graella_horitzontal:
+		MOV R4 , [R3] 
+		MOVH R4 , 00000111b ; Format del text a imprimir 
+		MOV [R0], R4 
+		INC R0 
+		INC R3
+		DEC R2
+		BRNZ imprimir_graella_horitzontal
+	; Tornem a inicialitzar el registre que apunta a l'adre ça base
+	; de la pantalla
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA
+	MOVH R2, 00h
+	MOVL R2, 6 ; La pantalla té 6 files
+	; Utilitzem R3 per referenciar el vector a imprimir
+	MOVH R3, BYTEALTO DIRECCION graella_vertical
+	MOVL R3, BYTEBAJO DIRECCION graella_vertical
+
+	MOVH R4, 00h
+	MOVL R4, 19
+	ADD R0, R0, R4 ;to start from the (1,4)
+	
+	; Utilitzem R1 com a deesplaçament per saltar de fila
+	MOVH R1, 00h
+	MOVL R1, 15
+	
+	imprimir_graella_vertical:
+		MOV R4 , [R3]
+		MOVH R4 , 00000111b ; Format del text a imprimir
+		MOV [R0], R4
+		ADD R0 , R0 , R1
+		INC R3
+		DEC R2
+		BRNZ imprimir_graella_vertical
+	
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA
+	
+	MOVH R7, 00h
+	MOVL R7, 20
+	
+	ADD R0, R0, R7
+	
+	MOVH R5,00h
+	MOVL R5,06h
+	
+	; Utilitzem R3 per referenciar el vector a imprimir
+	;MOVH R3, BYTEALTO DIRECCION fila_a
+	;MOVL R3, BYTEBAJO DIRECCION fila_a
+	
+	MOVL R4, 0h
+	MOVH R4 , 00001000b ; Format del text a imprimir
+	
+	Print_caselles_inicials:
+		MOVH R2, 00h
+		MOVL R2, 6 ; La pantalla té 6 files
+		; Utilitzem R1 com a deesplaçament per saltar de fila
+		MOVH R1, 00h
+		MOVL R1, 9
+	
+		fila:
+			CALL toggle_color
+			MOV [R0], R4
+			INC R0
+			;INC R3
+			DEC R2
+			BRNZ fila
+		CALL toggle_color
+		ADD R0, R0, R1
+		DEC R5
+		BRNZ Print_caselles_inicials
+	RET
+	
+	; Toggle function to alternate between two values
+	toggle_color:
+		MOVL R6, 0h
+		MOVH R6, 00111111b    ; First value
+		
+		MOVL R3, 0h
+		MOVH R3, 00001000b    ; Second value
+		COMP R4, R3          
+		BRZ switch  
+		MOV R4, R3          
+		RET                
+	switch:
+		MOV R4, R6         
+		RET     
+
+imprimir_estat_joc:
+	; Utilitzem R0 per accedir a la pantalla
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA
+	; Despla çem la posici ó inicial de la pantalla
+	MOVH R1, 0 
+	MOVL R1, 57 
+	ADD R0 , R0 , R1 
+	; Utilitzem R1 com a contador per imprimir 'P=' 
+	MOVH R1, 0 
+	MOVL R1, 2 
+	; Utilitzem R2 per referenciar el vector a imprimir 
+	MOVH R2, BYTEALTO DIRECCION Letras 
+	MOVL R2, BYTEBAJO DIRECCION Letras 
+	imprimir_punts: 
+		MOV R3 , [R2] 
+		MOVH R3 , 00110000b ; Format del text a imprimir 
+		MOV [R0], R3 
+		INC R0 
+		INC R2 
+		DEC R1 
+		BRNZ imprimir_punts
+	; Per imprimir el número de punts cal imprimir el car àcter
+	; corresponent al número , i no directament el nú mero. El 
+	; codi ASCII del 0 és 30h, per tant , caldr à sumar 30h al
+	; valor actual de la puntuaci ó per imprimir -ho.
+	MOV R3 , [R2] 
+	MOVL R1 , 30h 
+	ADD R3 , R3 , R1  
+	MOVH R3 , 00110000b ; Format del text a imprimir
+	MOV [R0], R3
+	; Tornema inicilitzar registres per imprimir la munició 
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA 
+	; Desplaçem la posició inicial de la pantalla 
+	MOVH R1, 0 
+	MOVL R1, 87 
+	ADD R0 , R0 , R1
+	; Utilitzem R1 com a contador per imprimir 'M=' 
+	MOVH R1, 0 
+	MOVL R1, 2 
+	; Utilitzem R2 per referenciar el vector a imprimir 
+	MOVH R2, BYTEALTO DIRECCION Numeros 
+	MOVL R2, BYTEBAJO DIRECCION Numeros 
+	imprimir_municio: 
+		MOV R3 , [R2] 
+		MOVH R3 , 00110000b ; Format del text a imprimir 
+		MOV [R0], R3 
+		INC R0 
+		INC R2 
+		DEC R1 
+		BRNZ imprimir_municio 
+		
+		MOV R3 , [R2] 
+		MOVL R1 , 30h 
+		ADD R3 , R3 , R1 
+		MOVH R3 , 00110000b ; Format del text a imprimir 
+		MOV [R0], R3 
+	RET
+
+demanar_coordenades:
+	; Imprimim el text de demanar a l'usuari les coordenades 
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA
+	; Despla çem la posici ó inicial de la pantalla 
+	MOVH R1, 0 
+	MOVL R1, 105
+	ADD R0 , R0 , R1 
+	; Utilitzem R1 com a contador 
+	MOVL R1, 13 
+	; Utilitzem R2 per referenciar el vector a imprimir 
+	MOVH R2, BYTEALTO DIRECCION text_coordenades 
+	MOVL R2, BYTEBAJO DIRECCION text_coordenades
+	imprimir_coordenades: 
+		MOV R3 , [R2] 
+		MOVH R3 , 00110000b ; Format del text a imprimir 
+		MOV [R0], R3 
+		INC R0 
+		INC R2
+		DEC R1 
+		BRNZ imprimir_coordenades 
+		; En les dues ú ltimes posicions imprimirem el car àcter '_' 
+		; en un color diferent perqu è l'usuari visualitzi que aqu ı́ 
+		; és on s'ha d'escriure 
+		MOVH R3 , 00111001b ; Format del text a imprimir 
+		MOVL R3 , '_' 
+		MOV [R0], R3 
+		INC R0 
+		MOV [R0], R3
+	RET
+
+esperant_coordenades:
+	;Fem una crida al procediment que consulta l'estat del TECLAT
+	MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat
+	MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+	CALL R0
+	
+	MOVH R0, BYTEALTO TECLAT
+	MOVL R0, BYTEBAJO TECLAT
+	
+	MOV R1, [R0]
+	MOVH R1, 00h
+	
+	MOVH R0, 00h
+	MOVL R0, 'a'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+	
+	MOVL R0, 'b'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+	
+	MOVL R0, 'c'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+	
+	MOVL R0, 'd'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+	
+	MOVL R0, 'e'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+
+	MOVL R0, 'f'
+	COMP R1, R0
+	BRZ coordenada_x_valida
+	
+	JMP esperant_coordenades
+	
+	coordenada_x_valida:
+		MOVH R1, BYTEALTO DIRECCION coordenada_x
+		MOVL R1, BYTEBAJO DIRECCION coordenada_x
+		MOV [R1], R0
+		
+		MOVH R1, BYTEALTO PANTALLA
+		MOVL R1, BYTEBAJO PANTALLA
+		
+		MOVH R2, 00h
+		MOVL r2, 118
+		ADD R1, R1, R2
+		MOVH R0, 00111001b
+		MOV [R1], R0
+	RET
+				
+
+	
+
+
+	
+
+
+FIN 
