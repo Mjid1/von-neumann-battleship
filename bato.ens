@@ -24,13 +24,14 @@ INICIO ini
 	
 	; Vectors per mostrar i desar l'estat del joc
 	; (punts i munici ó actuals)
-	Letras VALOR 'L', '=', ""
-	Numeros VALOR 'N', '=', ""
+	Letras VALOR "L="
+	coordenada_x VALOR ' '
+	Numeros VALOR "N="
+	coordenada_y VALOR 0
+	
+	punts VALOR 'P', '=', 0
 	
 	text_coordenades VALOR "ENTRA COORD: "
-	
-	coordenada_x VALOR ' '
-
 	
 	fila_a VALOR 1,1,1,0,0,0 
 	fila_b VALOR 0,0,0,0,0,1 
@@ -89,6 +90,11 @@ ini:   ;programa principal
 		MOVH R0, BYTEALTO DIRECCION esperant_coordenades
 		MOVL R0, BYTEBAJO DIRECCION esperant_coordenades
 		CALL R0
+		
+		MOVH R0, BYTEALTO DIRECCION calcular_hit
+		MOVL R0, BYTEBAJO DIRECCION calcular_hit
+		CALL R0
+		
 		JMP -1
 		
 
@@ -319,8 +325,6 @@ imprimir_estat_joc:
 	; codi ASCII del 0 és 30h, per tant , caldr à sumar 30h al
 	; valor actual de la puntuaci ó per imprimir -ho.
 	MOV R3 , [R2] 
-	MOVL R1 , 30h 
-	ADD R3 , R3 , R1  
 	MOVH R3 , 00110000b ; Format del text a imprimir
 	MOV [R0], R3
 	; Tornema inicilitzar registres per imprimir la munició 
@@ -346,8 +350,6 @@ imprimir_estat_joc:
 		BRNZ imprimir_municio 
 		
 		MOV R3 , [R2] 
-		MOVL R1 , 30h 
-		ADD R3 , R3 , R1 
 		MOVH R3 , 00110000b ; Format del text a imprimir 
 		MOV [R0], R3 
 	RET
@@ -419,7 +421,6 @@ esperant_coordenades:
 	MOVL R0, 'f'
 	COMP R1, R0
 	BRZ coordenada_x_valida
-	
 	JMP esperant_coordenades
 	
 	coordenada_x_valida:
@@ -431,11 +432,132 @@ esperant_coordenades:
 		MOVL R1, BYTEBAJO PANTALLA
 		
 		MOVH R2, 00h
-		MOVL r2, 118
+		MOVL R2, 59
 		ADD R1, R1, R2
 		MOVH R0, 00111001b
 		MOV [R1], R0
+	
+esperant_coordenada_y:
+	MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat
+	MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+	CALL R0
+	
+	coordenada_vertical:
+		MOVH R0, BYTEALTO TECLAT
+		MOVL R0, BYTEBAJO TECLAT
+		
+		MOV R1, [R0]
+		
+		MOVH R1, 00h
+		
+		MOVH R0, 00h
+		MOVL R0, '1'
+		
+		COMP R1, R0
+		BRZ coordenada_y_valida
+		
+		MOVL R0, '2'
+		COMP R1, R0 
+		BRZ coordenada_y_valida
+		
+		MOVL R0, '3'
+		COMP R1, R0 
+		BRZ coordenada_y_valida
+		
+		MOVL R0, '4'
+		COMP R1, R0 
+		BRZ coordenada_y_valida
+		
+		MOVL R0, '5'
+		COMP R1, R0 
+		BRZ coordenada_y_valida
+		
+		MOVL R0, '6'
+		COMP R1, R0 
+		BRZ coordenada_y_valida
+		
+		JMP esperant_coordenada_y
+		
+		coordenada_y_valida:
+			MOVH R1, BYTEALTO DIRECCION coordenada_y
+			MOVL R1, BYTEBAJO DIRECCION coordenada_y
+			
+			MOV [R1], R0
+			
+			MOVH R1, BYTEALTO PANTALLA
+			MOVL R1, BYTEBAJO PANTALLA
+			
+			MOVH R2, 00h
+			MOVL R2, 89
+			ADD R1, R1, R2
+			
+			MOVH R0, 00111001b
+			MOV [R1], R0
 	RET
+	
+calcular_hit:
+	MOVH R0, BYTEALTO DIRECCION coordenada_x
+	MOVL R0, BYTEBAJO DIRECCION coordenada_x
+	MOV R0, [R0]
+	MOVH R1, BYTEALTO DIRECCION coordenada_y
+	MOVL R1, BYTEBAJO DIRECCION coordenada_y
+	MOV R1, [R1]
+	
+	MOVH R2, 00h
+	MOVL R2, 30h
+	SUB R1, R1, R2
+	
+	MOVL R2, 15
+	MOVH R3, 00h
+	MOVL R3, 00h
+	mul:
+		ADD R3, R3, R2
+		DEC R1
+		BRNZ mul
+	
+	MOVL R2, 40h
+	SUB R0, R0, R2
+	ADD R1, R3, R0
+	
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA
+	ADD R0, R0, R1
+	
+	MOVH R2, BYTEALTO DIRECCION fila_a
+	MOVL R2, BYTEBAJO DIRECCION fila_a
+	ADD R2, R2, R1
+	MOV R2, [R2]
+	
+	MOVH R1, 00h
+	MOVL R1, 1
+	COMP R1, R2
+	BRZ tocat
+	MOVH R1, 00000100b
+	MOVL R1, 'o'
+	JMP imprimir_resultat
+	
+	tocat:
+		MOVH R1, 00111010b
+		MOVL R1, 'X'
+		
+		MOVH R2, BYTEALTO DIRECCION punts
+		MOVL R2, BYTEBAJO DIRECCION punts
+		INC R2
+		INC R2
+		MOV R3, [R2]
+		INC R3
+		MOV [R2], R3
+	
+	imprimir_resultat:
+		MOV [R0], R1
+	
+	RET
+	
+
+	
+	
+	
+
 				
 
 	
