@@ -29,9 +29,14 @@ INICIO ini
 	coordenada_y VALOR 0
 	
 	;text final
-	text_final_1 VALOR "ENHORABONA"
-	text_final_2 VALOR "INTENTS="
-	intentos VALOR 0
+	text_final_1 VALOR  "               "
+	text_final_2 VALOR	"               "
+	text_final_3 VALOR  "   ENHORABONA  "					
+	text_final_4 VALOR  "  INTENTS = "
+	intentos_tens VALOR 30h
+	intentos_units VALOR 30h
+	
+	DEST_ADDRESS VALOR 0
 	
 	found VALOR 0
 	
@@ -210,7 +215,7 @@ esperant_espai:
 	MOVH R0, BYTEALTO TECLAT
 	MOVL R0, BYTEBAJO TECLAT
 	
-	MOV R1 , [R0] ; Llegim el car àcter que hi ha al buffer
+	MOV R1 , [R0] ; Llegim el caràcter que hi ha al buffer
 	
 	; A R0 posem el codi rastreig/ASCII de l'espai
 	MOVH R0, 32h
@@ -621,14 +626,42 @@ calcular_hit:
 	
 	imprimir_resultat:
 		MOV [R0], R1
-		;counter increase
-		MOVH R2, BYTEALTO DIRECCION intentos
-		MOVL R2, BYTEBAJO DIRECCION intentos
-		MOV R3, [R2]
-		INC R3
-		MOV [R2], R3
-	RET
-	
+		;counter increase		
+		; Load the address of 'intentos_tens' into R2
+		MOVH R2, BYTEALTO DIRECCION intentos_tens
+		MOVL R2, BYTEBAJO DIRECCION intentos_tens
+
+		; Load the address of 'intentos_units' into R3
+		MOVH R3, BYTEALTO DIRECCION intentos_units
+		MOVL R3, BYTEBAJO DIRECCION intentos_units
+
+		; Load the current ASCII representation of the tens and units digits from memory
+		MOV R4, [R2] ; Load tens digit
+		MOV R5, [R3] ; Load units digit
+
+		; Increment the units digit
+		INC R5
+		; Check if the units digit exceeds '9'
+		MOVH R6, 00h
+		MOVL R6, 3Ah ; ASCII '9'
+		COMP R5, R6
+		BRNZ store_units_digit ; If units digit is less than or equal to '9', jump to store_units_digit
+
+		; If units digit exceeds '9', reset it to '0' and increment the tens digit
+		MOVL R5, 30h ; ASCII '0'
+		MOVH R5, 0
+		MOV [R3], R5 ; Store '0' as the units digit
+		; Increment the tens digit
+		INC R4
+
+		store_units_digit:
+		; Store the updated units digit back in memory
+		MOV [R3], R5
+
+		; Store the updated tens digit back in memory
+		MOV [R2], R4
+		
+		RET
 counter:
     ; Load the address of fila_a into R1
     MOVH R1, BYTEALTO DIRECCION fila_a
@@ -693,14 +726,13 @@ final:
 	MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
 	CALL R0
 	
-	CALL convert_hex_num_to_string
 	;Utilitzem R0 per accedir a la pantalla
 	MOVH R0, BYTEALTO  PANTALLA 
 	MOVL R0, BYTEBAJO  PANTALLA 
 	; Utilitzem R2 de contador , amb les 120 posicions 
 	; de la pantalla
 	MOVH R2, 00h 
-	MOVL R2, 20
+	MOVL R2, 60
 	; Utilitzem R3 per referenciar el vector a imprimir 
 	MOVH R3, BYTEALTO DIRECCION text_final_1 
 	MOVL R3, BYTEBAJO DIRECCION text_final_1 
@@ -708,7 +740,7 @@ final:
 	imprimir_final: 
 		MOV R4 , [R3] 
 		; Llegim el valor de mem òria a imprimir 
-		MOVH R4 , 00110000b ; Establim el format del text a imprimir
+		MOVH R4 , 00000110b ; Establim el format del text a imprimir
 		MOV [R0], R4 ; Enviem a pantalla les dades a imprimir 
 		INC R0 ; Movem a la seg üent posici ó de pantalla 
 		INC R3 ; Movem a la seg üent posici ó del vector 
@@ -716,18 +748,20 @@ final:
 		BRNZ imprimir_final ; Quan el contador és 0, hem acabat
 	JMP -1
 
-convert_hex_num_to_string:
-	MOVH R5, BYTEALTO DIRECCION intentos 
-	MOVL R5, BYTEBAJO DIRECCION intentos 
-	MOV R6, [R5]
-	
-	MOVH R0, 0h
-	MOVL R0, 48
-	
-	SUB R6, R6, R0
-	
-	MOV [R5], R6
-	RET
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -737,6 +771,9 @@ convert_hex_num_to_string:
 
 	
 
-	
+
+
+
+
 
 FIN 
