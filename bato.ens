@@ -9,36 +9,49 @@ INICIO ini
  
 .DATOS 
 	; Vectors per imprimir la pantalla de tı́tol del joc
-    text_splash_1 VALOR "BATTLESHIP v0.8"
-	text_splash_2 VALOR	"BATTLESHIP v0.8"
-	text_splash_3 VALOR "BATTLESHIP v0.8"
-	text_splash_4 VALOR "BATTLESHIP v0.8"
-	text_splash_5 VALOR "BATTLESHIP v0.8"
-	text_splash_6 VALOR "BATTLESHIP v0.8"
-	text_splash_7 VALOR	"BATTLESHIP v0.8"
-	text_splash_8 VALOR	"BATTLESHIP v0.8"
+    text_splash_1 VALOR "###############"
+	text_splash_2 VALOR	"###############"
+	text_splash_3 VALOR "###############"
+	text_splash_4 VALOR "###############"
+	text_splash_5 VALOR "###############"
+	text_splash_6 VALOR "###############"
+	text_splash_7 VALOR	"###############"
+	text_splash_8 VALOR	"###############"
 	
 	; Vectors per imprimir la graella de joc 
 	graella_horitzontal VALOR "     123456     "
 	graella_vertical VALOR "abcdef"
 	
 	; Vectors per mostrar i desar l'estat del joc
-	; (punts i munici ó actuals)
 	Letras VALOR "L="
 	coordenada_x VALOR ' '
 	Numeros VALOR "N="
 	coordenada_y VALOR 0
 	
-	punts VALOR 'P', '=', 0
+	;text final
+	text_final_1 VALOR "ENHORABONA"
+	text_final_2 VALOR "INTENTS="
+	intentos VALOR 0
+	
+	found VALOR 0
+	
+	contador_de_veix VALOR 0
 	
 	text_coordenades VALOR "ENTRA COORD: "
 	
-	fila_a VALOR 1,1,1,0,0,0 
-	fila_b VALOR 0,0,0,0,0,1 
-	fila_c VALOR 1,0,1,1,0,0 
-	fila_d VALOR 1,0,0,0,0,0 
-	fila_e VALOR 0,0,0,0,0,1 
-	fila_f VALOR 0,0,0,1,0,0 
+	;fila_a VALOR 1,1,1,0,0,0 
+	;fila_b VALOR 0,0,0,0,0,1 
+	;fila_c VALOR 1,0,1,1,0,0 
+	;fila_d VALOR 1,0,0,0,0,0 
+	;fila_e VALOR 0,0,0,0,0,1 
+	;fila_f VALOR 0,0,0,1,0,0 
+	
+	fila_a VALOR 1,0,0,0,0,0 
+	fila_b VALOR 0,0,0,0,0,0 
+	fila_c VALOR 0,0,0,0,0,0 
+	fila_d VALOR 0,0,0,0,0,0 
+	fila_e VALOR 0,0,0,0,0,0 
+	fila_f VALOR 0,0,0,0,0,1 
 	
 	
 	
@@ -46,21 +59,26 @@ INICIO ini
  
 ini:   ;programa principal  
 	
-	; Començem netejant la pantalla per deixar -la tota negra
-	MOVH R0, BYTEALTO DIRECCION netejar_pantalla
-	MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
-	CALL R0 
-		
-	; Mostrem la pantalla inicial 'splash' del programa
-	MOVH R0, BYTEALTO DIRECCION splash 
-	MOVL R0, BYTEBAJO DIRECCION splash 
+	MOVH R0, BYTEALTO DIRECCION counter 
+	MOVL R0, BYTEBAJO DIRECCION counter
 	CALL R0
 	
-	; Monitoritzem el teclat fins que l'usuari apreti la 
-	; tecla espai
-	MOVH R0, BYTEALTO DIRECCION esperant_espai 
-	MOVL R0, BYTEBAJO DIRECCION esperant_espai 
-	CALL R0 
+	
+	;; Començem netejant la pantalla per deixar -la tota negra
+	;MOVH R0, BYTEALTO DIRECCION netejar_pantalla
+	;MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
+	;CALL R0 
+	;	
+	;; Mostrem la pantalla inicial 'splash' del programa
+	;MOVH R0, BYTEALTO DIRECCION splash 
+	;MOVL R0, BYTEBAJO DIRECCION splash 
+	;CALL R0
+	;
+	;; Monitoritzem el teclat fins que l'usuari apreti la 
+	;; tecla espai
+	;MOVH R0, BYTEALTO DIRECCION esperant_espai 
+	;MOVL R0, BYTEBAJO DIRECCION esperant_espai 
+	;CALL R0 
 	
 	; Si estem aqui significa que s'ha apretat la tecla 
 	;espai, i el joc ha de començar 
@@ -95,7 +113,12 @@ ini:   ;programa principal
 		MOVL R0, BYTEBAJO DIRECCION calcular_hit
 		CALL R0
 		
-		JMP -1
+		MOVH R0, BYTEALTO DIRECCION comprovar_final
+		MOVL R0, BYTEBAJO DIRECCION comprovar_final
+		CALL R0
+		
+		JMP torn_jugador
+	; Cridem de nou al procediment per netejar la pantalla 	
 		
 
 
@@ -496,74 +519,224 @@ esperant_coordenada_y:
 	RET
 	
 calcular_hit:
+
+	; Assuming coordinates_x and coordinates_y contain ASCII characters representing lowercase letters and numbers respectively
+	; Transform coordinates_x to numerical value
 	MOVH R0, BYTEALTO DIRECCION coordenada_x
-	MOVL R0, BYTEBAJO DIRECCION coordenada_x
-	MOV R0, [R0]
+	MOVL R0, BYTEBAJO DIRECCION coordenada_x ; Load the address of the memory location containing the ASCII character
+	MOV R0, [R0] ; Load the ASCII character into R0
+	MOVH R5, 00
+	MOVL R5, 96
+	SUB R0, R0, R5 ; Convert ASCII character to numerical value ('a' -> 0, 'b' -> 1, ..., 'z' -> 25)
+	; Now R0 contains the numerical value corresponding to the letter coordinate
+
+	; Transform coordinates_y to numerical value
 	MOVH R1, BYTEALTO DIRECCION coordenada_y
-	MOVL R1, BYTEBAJO DIRECCION coordenada_y
-	MOV R1, [R1]
+	MOVL R1, BYTEBAJO DIRECCION coordenada_y ; Load the address of the memory location containing the ASCII character
+	MOV R1, [R1] ; Load the ASCII character into R1
+	MOVH R5, 00
+	MOVL R5, 48
+	SUB R1, R1, R5 ; Convert ASCII character to numerical value ('0' -> 0, '1' -> 1, ..., '9' -> 9)
+	; Now R1 contains the numerical value corresponding to the number coordinate
 	
-	MOVH R2, 00h
-	MOVL R2, 30h
-	SUB R1, R1, R2
+	; Assuming fila and columna contain the numerical values of row and column respectively
+
+	; Step 1: Subtract 1 from both fila and columna
+	DEC R0
+	DEC R1
 	
-	MOVL R2, 15
-	MOVH R3, 00h
-	MOVL R3, 00h
-	mul:
-		ADD R3, R3, R2
-		DEC R1
-		BRNZ mul
+	; Initialize counter
+	MOVH R3, 0
+	MOVL R3, 15 ; Counter for the loop
+
 	
-	MOVL R2, 40h
-	SUB R0, R0, R2
-	ADD R1, R3, R0
+	XOR R4, R4, R4
+
+	; Step 2: Multiply the adjusted fila by 15 using repeated addition
+	repeat_addition:
+		; Add the adjusted fila to R2
+		ADD R4, R4, R0  ; Add fila to R2
+
+		; Check if the counter has reached 14 (for 14 iterations)
+		DEC R3
+		BRNZ repeat_addition ; Repeat the addition if counter is not zero
+
+	; At this point, R2 will hold the result of the multiplication
+		; Initialize counter
+	MOVH R3, 0
+	MOVL R3, 6 ; Counter for the loop
 	
+	XOR R6, R6, R6
+
+	; Step 2: Multiply the adjusted fila by 15 using repeated addition
+	repeat_addition2:
+		; Add the adjusted fila to R2
+		ADD R6, R6, R0  ; Add fila to R2
+
+		; Check if the counter has reached 14 (for 14 iterations)
+		DEC R3
+		BRNZ repeat_addition2 ; Repeat the addition if counter is not zero
+
+	; At this point, R2 will hold the result of the multiplication
+	
+
+	; Step 3: Add the adjusted columna
+	ADD R4, R4, R1 ; (fila - 1) * 15 + (columna - 1)
+	ADD R6, R6, R1
+
+	; Step 4: Add 19
+	MOVH R5, 00
+	MOVL R5, 20
+	ADD R4, R4, R5 ; (fila - 1) * 15 + (columna - 1) + 20
+
+	; Now, R4 contains the result of the formula (fila - 1) * 15 + (columna - 1) + 19
+	; Now, R6 contains the result of the formula (fila - 1) * 6 + (columna - 1)
+
 	MOVH R0, BYTEALTO PANTALLA
 	MOVL R0, BYTEBAJO PANTALLA
-	ADD R0, R0, R1
+	ADD R0, R0, R4
 	
 	MOVH R2, BYTEALTO DIRECCION fila_a
 	MOVL R2, BYTEBAJO DIRECCION fila_a
-	ADD R2, R2, R1
+	ADD R2, R2, R6
 	MOV R2, [R2]
 	
 	MOVH R1, 00h
 	MOVL R1, 1
 	COMP R1, R2
 	BRZ tocat
-	MOVH R1, 00000100b
+	MOVH R1, 00100100b
 	MOVL R1, 'o'
 	JMP imprimir_resultat
 	
 	tocat:
-		MOVH R1, 00111010b
+		MOVH R1, 00010010b
 		MOVL R1, 'X'
 		
-		MOVH R2, BYTEALTO DIRECCION punts
-		MOVL R2, BYTEBAJO DIRECCION punts
-		INC R2
-		INC R2
+		MOVH R2, BYTEALTO DIRECCION found
+		MOVL R2, BYTEBAJO DIRECCION found
 		MOV R3, [R2]
 		INC R3
 		MOV [R2], R3
 	
 	imprimir_resultat:
 		MOV [R0], R1
-	
+		;counter increase
+		MOVH R2, BYTEALTO DIRECCION intentos
+		MOVL R2, BYTEBAJO DIRECCION intentos
+		MOV R3, [R2]
+		INC R3
+		MOV [R2], R3
 	RET
 	
+counter:
+    ; Load the address of fila_a into R1
+    MOVH R1, BYTEALTO DIRECCION fila_a
+    MOVL R1, BYTEBAJO DIRECCION fila_a
+    
+    ; Initialize R4 with the value 36
+    MOVH R4, 0h
+    MOVL R4, 36
+    
+    ; Initialize R5 with the value 1
+    MOVH R5, 0h
+    MOVL R5, 01h
+    
+    ; Clear R6 to use it as the counter for matches
+    XOR R6, R6, R6
+    
+count:
+    ; Load the value from memory pointed by R1 into R3
+    MOV R3, [R1]
+    
+    ; Compare R3 with the desired value (R4 in this case, which is 36)
+    COMP R3, R5
+    
+    ; If R3 equals R4, increment the counter in R6
+    BRZ increment
+	INC R1
+	DEC R4
+	BRNZ count
 
+increment:
+    ; Decrement the address in R1 to move to the previous memory location
+	INC R6
+    INC R1
+	DEC R4
+    BRNZ count
+
+    ; At this point, R6 contains the count of matches (36 in this case)
+    
+    ; Do any additional operations needed with the count in R6 here
+	MOVH R1, BYTEALTO DIRECCION contador_de_veix
+    MOVL R1, BYTEBAJO DIRECCION contador_de_veix
+	MOV [R1], R6
+	
+    RET
+
+comprovar_final:
+	MOVH R1, BYTEALTO DIRECCION contador_de_veix
+    MOVL R1, BYTEBAJO DIRECCION contador_de_veix
+	MOV R2, [R1] 
+	
+	MOVH R3, BYTEALTO DIRECCION found
+    MOVL R3, BYTEBAJO DIRECCION found
+	MOV R4, [R3] 
 	
 	
+	COMP R2, R4
+	BRZ final
+	RET
+
+final:
+	MOVH R0, BYTEALTO DIRECCION netejar_pantalla 
+	MOVL R0, BYTEBAJO DIRECCION netejar_pantalla
+	CALL R0
+	
+	CALL convert_hex_num_to_string
+	;Utilitzem R0 per accedir a la pantalla
+	MOVH R0, BYTEALTO  PANTALLA 
+	MOVL R0, BYTEBAJO  PANTALLA 
+	; Utilitzem R2 de contador , amb les 120 posicions 
+	; de la pantalla
+	MOVH R2, 00h 
+	MOVL R2, 20
+	; Utilitzem R3 per referenciar el vector a imprimir 
+	MOVH R3, BYTEALTO DIRECCION text_final_1 
+	MOVL R3, BYTEBAJO DIRECCION text_final_1 
+	
+	imprimir_final: 
+		MOV R4 , [R3] 
+		; Llegim el valor de mem òria a imprimir 
+		MOVH R4 , 00110000b ; Establim el format del text a imprimir
+		MOV [R0], R4 ; Enviem a pantalla les dades a imprimir 
+		INC R0 ; Movem a la seg üent posici ó de pantalla 
+		INC R3 ; Movem a la seg üent posici ó del vector 
+		DEC R2 ; Decrementem el contador
+		BRNZ imprimir_final ; Quan el contador és 0, hem acabat
+	JMP -1
+
+convert_hex_num_to_string:
+	MOVH R5, BYTEALTO DIRECCION intentos 
+	MOVL R5, BYTEBAJO DIRECCION intentos 
+	MOV R6, [R5]
+	
+	MOVH R0, 0h
+	MOVL R0, 48
+	
+	SUB R6, R6, R0
+	
+	MOV [R5], R6
+	RET
+
+
+
+
+
+
+
 	
 
-				
-
 	
-
-
-	
-
 
 FIN 
