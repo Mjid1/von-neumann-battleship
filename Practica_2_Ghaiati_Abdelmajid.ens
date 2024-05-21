@@ -1,0 +1,861 @@
+; --------------------------------------------------------------- 
+; Nom alumne : Abdelmajid Ghaiati
+; Grup: PR-AVA1. Grup 2.
+; Sessió: PR-PRA2 
+; ---------------------------------------------------------------
+
+TECLAT EQU 0E000h
+PANTALLA EQU 0F000h 
+
+ORIGEN 10h 
+ 
+INICIO ini 
+ 
+.DATOS 
+	; matrix of the start screen 
+    text_splash_1 VALOR "###############"
+	text_splash_2 VALOR	"###############"
+	text_splash_3 VALOR "###############"
+	text_splash_4 VALOR "#####PITJA#####"
+	text_splash_5 VALOR "#####ESPAI#####"
+	text_splash_6 VALOR "###############"
+	text_splash_7 VALOR	"###############"
+	text_splash_8 VALOR	"###############"
+	
+	; vectors for the vertical and horizontal grid lines
+	graella_horitzontal VALOR "     123456     "
+	graella_vertical VALOR "abcdef"
+	
+	; text for the coordinates prompt
+	Letras VALOR "L="
+	coordenada_x VALOR ' '
+	Numeros VALOR "N="
+	coordenada_y VALOR 0
+	
+	; text for the final screen 
+	text_final_1 VALOR  "               "
+	text_final_2 VALOR	"               "
+	text_final_3 VALOR  "   ENHORABONA  "					
+	text_final_4 VALOR  "  INTENTS = "
+
+	; variables for the game logic to keep track of the number of tries
+	intentos_tens VALOR 30h     ; Tens digit of the number of tries
+	intentos_units VALOR 30h	; Units digit of the number of tries
+	
+	;variables for the game logic to keep track of the number of founded ships in the grid
+	found VALOR 0
+	
+	contador_de_ships VALOR 0 			; Variable to store the total number of ships in the grid
+	
+	text_coordenades VALOR "  ENTRA COORD  " 		;Text to prompt the user to enter coordinates
+	
+	; matrix for the initial grid of the game the ones are the ships and the zeros are the empty spaces
+	fila_a VALOR 1,1,1,0,0,0 
+	fila_b VALOR 0,0,0,0,0,1 
+	fila_c VALOR 1,0,1,1,0,0 
+	fila_d VALOR 1,0,0,0,0,0 
+	fila_e VALOR 0,0,0,0,0,1 
+	fila_f VALOR 0,0,0,1,0,0 
+		
+	
+.CODIGO 
+ 
+ini:   ;programa principal  
+	
+	;counter is a procedure that counts the number of ships in the grid and stores the result in contador_de_ships 
+	MOVH R0, BYTEALTO DIRECCION counter 
+	MOVL R0, BYTEBAJO DIRECCION counter
+	CALL R0
+	
+	
+	;clean_screen is a procedure that clears the screen
+	MOVH R0, BYTEALTO DIRECCION clean_screen
+	MOVL R0, BYTEBAJO DIRECCION clean_screen
+	CALL R0 
+		
+	; splash is a procedure that displays the start screen of the game using the text_splash_x vectors
+	MOVH R0, BYTEALTO DIRECCION splash 
+	MOVL R0, BYTEBAJO DIRECCION splash 
+	CALL R0
+	
+	; wait_for_space is a procedure that waits for the user to press the space bar to start the game ignoring any other key
+	MOVH R0, BYTEALTO DIRECCION wait_for_space 
+	MOVL R0, BYTEBAJO DIRECCION wait_for_space 
+	CALL R0 
+	
+
+	;if the space bar is pressed, the game starts 
+	
+	; we call the procedure to clean the screen again
+	MOVH R0, BYTEALTO DIRECCION clean_screen 
+	MOVL R0, BYTEBAJO DIRECCION clean_screen
+	CALL R0
+	
+	; now we call the procedure to print the grid of the game using the graella_horitzontal and graella_vertical vectors 
+	MOVH R0, BYTEALTO DIRECCION print_grid
+	MOVL R0, BYTEBAJO DIRECCION print_grid
+	CALL R0
+	
+	torn_jugador: ; we start the game loop here until the player finds all the ships in the grid then we go to the final screen printing the number of tries
+
+		; this procedure prints the game coordinates (P= and N=) 
+		MOVH R0 , BYTEALTO DIRECCION imprimir_estat_joc 
+		MOVL R0 , BYTEBAJO DIRECCION imprimir_estat_joc 
+		CALL R0
+		
+		; this procedure prompts the user to enter the coordinates
+		MOVH R0 , BYTEALTO DIRECCION demanar_coordenades 
+		MOVL R0 , BYTEBAJO DIRECCION demanar_coordenades
+		CALL R0
+		
+		; this procedure waits for the user to enter the coordinates and stores them in the coordenada_x and coordenada_y variables, accept only valid coordinates 
+		MOVH R0, BYTEALTO DIRECCION esperant_coordenades
+		MOVL R0, BYTEBAJO DIRECCION esperant_coordenades
+		CALL R0
+		
+		; this procedure calculates the hit of the user and prints the result on the screen (if the user hit a ship we print a green pixel and if not we print a red pixel ignoring the already selected coordinates)
+		MOVH R0, BYTEALTO DIRECCION calcular_hit
+		MOVL R0, BYTEBAJO DIRECCION calcular_hit
+		CALL R0
+		
+		;this procedure checks if the game is over (if the user found all the ships in the grid) and if so it goes to the final screen printing the number of tries and the congratulations message
+		MOVH R0, BYTEALTO DIRECCION comprovar_final
+		MOVL R0, BYTEBAJO DIRECCION comprovar_final
+		CALL R0
+		
+		JMP torn_jugador ; we go back to the game loop until the user finds all the ships in the grid
+
+		
+;########## here we have the procedures that we call in the main program ##########
+
+clean_screen: 
+	; To clear the screen, we need to access the control register 
+	; of the screen, located after the video memory,
+	; <BASE_ADDRESS> + 120
+
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA 
+	MOVH R1, 00h 
+	MOVL R1, 120 
+	ADD R0 , R0 , R1
+	; Mask to clear the screen:
+	; Bit 0:
+	; If this bit is set to 1, the screen is reset
+	; Bit 1: 165
+	; Value 1 == screen on
+	; Value 0 == screen off
+	MOVH R1, 00h
+	MOVL R1, 11b
+	MOV [R0], R1
+	RET
+
+; Displays the initial game title screen from what is
+; defined in the memory vectors 'text_splash_x'
+splash: 
+	; We use R0 to access the screen
+	MOVH R0, BYTEALTO PANTALLA 
+	MOVL R0, BYTEBAJO PANTALLA 
+	; We use R2 as a counter, with the 120 positions
+	; of the screen
+	MOVH R2, 00h 
+	MOVL R2, 120
+	; We use R3 to reference the vector to print
+	MOVH R3, BYTEALTO DIRECCION text_splash_1 
+	MOVL R3, BYTEBAJO DIRECCION text_splash_1 
+	
+	imprimir_titol: 
+		MOV R4 , [R3] 
+		; We read the memory value to print
+		MOVH R4 , 00110000b ; We set the format of the text to print
+		MOV [R0], R4 ; We send the data to print to the screen
+		INC R0 ; Move to the next screen position 
+		INC R3 ; Move to the next position of the vector
+		DEC R2 ; Decrement the counter
+		BRNZ imprimir_titol ; When the counter is 0, we are done
+	RET
+	
+	; This procedure checks the state of the keyboard control register
+	; iteratively, and ends when it detects that
+	; there is data in the buffer
+consulta_estat_teclat:
+	; We use R0 to access the base address of the keyboard
+	MOVH R0, BYTEALTO TECLAT 
+	MOVL R0, BYTEBAJO TECLAT 
+	
+	;Increment R0 to access the keyboard control register
+	INC R0
+	
+	; Mask to check if there is data in the keyboard buffer
+	MOVH R1, 00000001b 
+	MOVL R1, 00h
+
+	consulta_estat: 
+		; We read the keyboard control register and save it in R4 
+		MOV R2,[R0]
+		; We compare what we get from the keyboard with what we expect to find
+		COMP R2, R1 
+		; If they are equal, it means that we have data in the buffer and we can
+		; proceed to read them, otherwise we return to check the status
+		BRNZ consulta_estat
+		RET
+		
+; This procedure will continue to execute until the user presses
+; the space key
+wait_for_space: 
+	; We make a call to the procedure that checks the status of the keyboard
+	MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat 
+	MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+	CALL R0 
+	
+	; If we are here it means that a key has been pressed on the keyboard. Now we will check which one.
+	; We initialize the R0 register to the keyboard data register
+	MOVH R0, BYTEALTO TECLAT
+	MOVL R0, BYTEBAJO TECLAT
+	
+	MOV R1 , [R0] ; We read the character that is in the buffer
+	
+	; In R0 we put the tracking/ASCII code of the space
+	MOVH R0, 32h
+	MOVL R0, 20h	
+	; We compare the data read from the keyboard with the space code
+	COMP R1, R0
+	; If they are not equal (result != 0), we return to check the status
+	BRNZ wait_for_space 
+	; If they are equal, we return from the procedure
+	RET
+
+print_grid:
+    ; Set R0 to point to the screen
+    MOVH R0, BYTEALTO PANTALLA
+    MOVL R0, BYTEBAJO PANTALLA 
+    ; Initialize R2 as a counter for the 15 columns of the screen
+    MOVH R2, 00h  
+    MOVL R2, 15
+    ; Set R3 to point to the horizontal grid vector
+    MOVH R3, BYTEALTO DIRECCION graella_horitzontal
+    MOVL R3, BYTEBAJO DIRECCION graella_horitzontal 
+
+	;this part of the code prints the horizontal grid lines on the screen (the numbers 1 to 6)
+    print_grid_horitzontal:
+        ; Load the value at the address pointed by R3 into R4
+        MOV R4 , [R3] 
+        ; Set the format of the text to print
+        MOVH R4 , 00000111b 
+        ; Write the value of R4 to the address pointed by R0 (screen)
+        MOV [R0], R4 
+        ; Increment the screen pointer and the horizontal grid vector pointer
+        INC R0 
+        INC R3
+        ; Decrement the column counter and repeat if not zero
+        DEC R2
+        BRNZ print_grid_horitzontal
+    ; Reset the screen pointer
+    MOVH R0, BYTEALTO PANTALLA
+    MOVL R0, BYTEBAJO PANTALLA
+    ; Reset the column counter and set the row counter to 6
+    MOVH R2, 00h
+    MOVL R2, 6 
+    ; Set R3 to point to the vertical grid vector
+    MOVH R3, BYTEALTO DIRECCION graella_vertical
+    MOVL R3, BYTEBAJO DIRECCION graella_vertical
+
+    ; Set R4 to 19 and add it to R0 to start from the (1,4)
+    MOVH R4, 00h
+    MOVL R4, 19
+    ADD R0, R0, R4 
+
+    ; Set R1 as the offset to jump to the next row
+    MOVH R1, 00h
+    MOVL R1, 15
+
+	;this part of the code prints the vertical grid lines on the screen (the letters a to f)
+    print_grid_vertical:
+        ; Load the value at the address pointed by R3 into R4
+        MOV R4 , [R3]
+        ; Set the format of the text to print
+        MOVH R4 , 00000111b 
+        ; Write the value of R4 to the address pointed by R0 (screen)
+        MOV [R0], R4
+        ; Add the row offset to the screen pointer
+        ADD R0 , R0 , R1
+        ; Increment the vertical grid vector pointer
+        INC R3
+        ; Decrement the row counter and repeat if not zero
+        DEC R2
+        BRNZ print_grid_vertical
+
+    ; Reset the screen pointer
+    MOVH R0, BYTEALTO PANTALLA
+    MOVL R0, BYTEBAJO PANTALLA
+
+    ; Set R1 to 20 and add it to R0
+    MOVH R1, 00h
+    MOVL R1, 20
+    ADD R0, R0, R1
+
+    ; Set R5 to 6
+    MOVH R5,00h
+    MOVL R5,06h
+
+    ; Set the format of the text to print
+    MOVL R4, 0h
+    MOVH R4 , 00001000b  ; blue color for the grid 
+
+	;this part of the code prints the initial grid of the game on the screen (the matrix defined in the fila_x vectors) by alternating between blue and white pixels
+    Print_caselles_inicials:
+        ; Set the row counter to 6
+        MOVH R2, 00h
+        MOVL R2, 6 
+        ; Set R1 as the offset to jump to the next row
+        MOVH R1, 00h
+        MOVL R1, 9
+
+        fila: ; Loop to print a row of the grid alternating between blue and white pixels
+            ; Call the function to toggle the color
+            CALL toggle_color
+            ; Write the value of R4 to the address pointed by R0 (screen)
+            MOV [R0], R4
+            ; Increment the screen pointer
+            INC R0
+            ; Decrement the row counter and repeat if not zero
+            DEC R2
+            BRNZ fila
+        ; Call the function to toggle the color
+        CALL toggle_color
+        ; Add the row offset to the screen pointer
+        ADD R0, R0, R1
+        ; Decrement the counter R5 and repeat if not zero
+        DEC R5
+        BRNZ Print_caselles_inicials
+    ; Return from the function
+    RET
+	
+	; Toggle function to alternate between two colors (blue and white)
+	toggle_color:
+		MOVL R6, 0h
+		MOVH R6, 00111111b    ; first color (white)
+		
+		MOVL R3, 0h
+		MOVH R3, 00001000b    ; second color (blue)
+		COMP R4, R3          
+		BRZ switch  
+		MOV R4, R3          
+		RET                
+	switch:
+		MOV R4, R6         
+		RET     
+
+imprimir_estat_joc:
+    ; We use R0 to access the screen
+    MOVH R0, BYTEALTO PANTALLA
+    MOVL R0, BYTEBAJO PANTALLA
+    ; We move the initial position of the screen
+    MOVH R1, 0 
+    MOVL R1, 57 
+    ADD R0 , R0 , R1 
+    ; We use R1 as a counter to print 'L=' 
+    MOVH R1, 0 
+    MOVL R1, 2 
+    ; We use R2 to reference the vector to print 
+    MOVH R2, BYTEALTO DIRECCION Letras 
+    MOVL R2, BYTEBAJO DIRECCION Letras 
+    imprimir_letras: 
+        ; Load the value at the address pointed by R2 into R3
+        MOV R3 , [R2] 
+        ; Set the format of the text to print
+        MOVH R3 , 00110000b 
+        ; Write the value of R3 to the address pointed by R0 (screen)
+        MOV [R0], R3 
+        ; Increment the screen pointer and the vector pointer
+        INC R0 
+        INC R2 
+        ; Decrement the counter and repeat if not zero
+        DEC R1 
+        BRNZ imprimir_letras
+    ; Print the last character of 'L='
+    MOV R3 , [R2] 
+    MOVH R3 , 00110000b ; Format of the text to print
+    MOV [R0], R3
+    ; Reinitialize the screen pointer
+    MOVH R0, BYTEALTO PANTALLA 
+    MOVL R0, BYTEBAJO PANTALLA 
+    ; Move the initial position of the screen 
+    MOVH R1, 0 
+    MOVL R1, 87 
+    ADD R0 , R0 , R1
+    ; We use R1 as a counter to print 'N=' 
+    MOVH R1, 0 
+    MOVL R1, 2 
+    ; We use R2 to reference the vector to print 
+    MOVH R2, BYTEALTO DIRECCION Numeros 
+    MOVL R2, BYTEBAJO DIRECCION Numeros 
+    imprimir_numeros: 
+        ; Load the value at the address pointed by R2 into R3
+        MOV R3 , [R2] 
+        ; Set the format of the text to print
+        MOVH R3 , 00110000b 
+        ; Write the value of R3 to the address pointed by R0 (screen)
+        MOV [R0], R3 
+        ; Increment the screen pointer and the vector pointer
+        INC R0 
+        INC R2 
+        ; Decrement the counter and repeat if not zero
+        DEC R1 
+        BRNZ imprimir_numeros 
+    ; Print the last character of 'N='
+    MOV R3 , [R2] 
+    MOVH R3 , 00110000b ; Format of the text to print 
+    MOV [R0], R3 
+    ; Return from the function
+    RET
+
+demanar_coordenades:
+    ; Print the text to ask the user for the coordinates
+    MOVH R0, BYTEALTO PANTALLA 
+    MOVL R0, BYTEBAJO PANTALLA
+    ; Move the initial position of the screen 
+    MOVH R1, 0 
+    MOVL R1, 105
+    ADD R0 , R0 , R1 
+    ; Use R1 as a counter 
+    MOVL R1, 15 
+    ; Use R2 to reference the vector to print 
+    MOVH R2, BYTEALTO DIRECCION text_coordenades 
+    MOVL R2, BYTEBAJO DIRECCION text_coordenades
+    imprimir_coordenades: 
+        ; Load the value at the address pointed by R2 into R3
+        MOV R3 , [R2] 
+        ; Set the format of the text to print
+        MOVH R3 , 00110000b 
+        ; Write the value of R3 to the address pointed by R0 (screen)
+        MOV [R0], R3 
+        ; Increment the screen pointer and the vector pointer
+        INC R0 
+        INC R2
+        ; Decrement the counter and repeat if not zero
+        DEC R1 
+        BRNZ imprimir_coordenades 
+    ; Return from the function
+    RET
+
+esperant_coordenades:
+    ; Call the procedure that checks the keyboard status
+    MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat
+    MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+    CALL R0
+    
+    ; Load the keyboard address into R0
+    MOVH R0, BYTEALTO TECLAT
+    MOVL R0, BYTEBAJO TECLAT
+    
+    ; Load the value at the keyboard address into R1 and clear the high byte of R1
+    MOV R1, [R0]
+    MOVH R1, 00h
+    
+    ; Compare the value in R1 with 'a' through 'f'
+    MOVH R0, 00h
+    MOVL R0, 'a'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'a', go to coordenada_x_valida
+    
+    MOVL R0, 'b'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'b', go to coordenada_x_valida
+    
+    MOVL R0, 'c'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'c', go to coordenada_x_valida
+    
+    MOVL R0, 'd'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'd', go to coordenada_x_valida
+    
+    MOVL R0, 'e'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'e', go to coordenada_x_valida
+
+    MOVL R0, 'f'
+    COMP R1, R0
+    BRZ coordenada_x_valida  ; If R1 is 'f', go to coordenada_x_valida
+    JMP esperant_coordenades  ; If R1 is not 'a' through 'f', jump back to the start
+    
+    coordenada_x_valida:
+        ; Store the valid x-coordinate in the memory location for coordenada_x
+        MOVH R1, BYTEALTO DIRECCION coordenada_x
+        MOVL R1, BYTEBAJO DIRECCION coordenada_x
+        MOV [R1], R0
+        
+        ; Load the screen address into R1
+        MOVH R1, BYTEALTO PANTALLA
+        MOVL R1, BYTEBAJO PANTALLA
+        
+        ; Add 59 to the screen address and store the result in R1
+        MOVH R2, 00h
+        MOVL R2, 59
+        ADD R1, R1, R2
+        
+        ; Write the ASCII code for '1' to the screen at the address in R1
+        MOVH R0, 00111001b
+        MOV [R1], R0
+    
+esperant_coordenada_y:
+    ; Call the procedure that checks the keyboard status
+    MOVH R0, BYTEALTO DIRECCION consulta_estat_teclat
+    MOVL R0, BYTEBAJO DIRECCION consulta_estat_teclat
+    CALL R0
+    
+    coordenada_vertical:
+        ; Load the keyboard address into R0
+        MOVH R0, BYTEALTO TECLAT
+        MOVL R0, BYTEBAJO TECLAT
+        
+        ; Load the value at the keyboard address into R1 and clear the high byte of R1
+        MOV R1, [R0]
+        MOVH R1, 00h
+        
+        ; Compare the value in R1 with '1' through '6'
+        MOVH R0, 00h
+        MOVL R0, '1'
+        COMP R1, R0
+        BRZ coordenada_y_valida  ; If R1 is '1', go to coordenada_y_valida
+        
+        MOVL R0, '2'
+        COMP R1, R0 
+        BRZ coordenada_y_valida  ; If R1 is '2', go to coordenada_y_valida
+        
+        MOVL R0, '3'
+        COMP R1, R0 
+        BRZ coordenada_y_valida  ; If R1 is '3', go to coordenada_y_valida
+        
+        MOVL R0, '4'
+        COMP R1, R0 
+        BRZ coordenada_y_valida  ; If R1 is '4', go to coordenada_y_valida
+        
+        MOVL R0, '5'
+        COMP R1, R0 
+        BRZ coordenada_y_valida  ; If R1 is '5', go to coordenada_y_valida
+        
+        MOVL R0, '6'
+        COMP R1, R0 
+        BRZ coordenada_y_valida  ; If R1 is '6', go to coordenada_y_valida
+        
+        JMP esperant_coordenada_y  ; If R1 is not '1' through '6', jump back to the start
+        
+        coordenada_y_valida:
+            ; Store the valid y-coordinate in the memory location for coordenada_y
+            MOVH R1, BYTEALTO DIRECCION coordenada_y
+            MOVL R1, BYTEBAJO DIRECCION coordenada_y
+            MOV [R1], R0
+            
+            ; Load the screen address into R1
+            MOVH R1, BYTEALTO PANTALLA
+            MOVL R1, BYTEBAJO PANTALLA
+            
+            ; Add 89 to the screen address and store the result in R1
+            MOVH R2, 00h
+            MOVL R2, 89
+            ADD R1, R1, R2
+            
+            ; Write the ASCII code for '1' to the screen at the address in R1
+            MOVH R0, 00111001b
+            MOV [R1], R0
+    RET  ; Return from the procedure
+	
+calcular_hit:
+
+	; Assuming coordinates_x and coordinates_y contain ASCII characters representing lowercase letters and numbers respectively
+	; Transform coordinates_x to numerical value
+	MOVH R0, BYTEALTO DIRECCION coordenada_x
+	MOVL R0, BYTEBAJO DIRECCION coordenada_x ; Load the address of the memory location containing the ASCII character
+	MOV R0, [R0] ; Load the ASCII character into R0
+	MOVH R5, 00
+	MOVL R5, 96
+	SUB R0, R0, R5 ; Convert ASCII character to numerical value ('a' -> 0, 'b' -> 1, ..., 'z' -> 25)
+	; Now R0 contains the numerical value corresponding to the letter coordinate
+
+	; Transform coordinates_y to numerical value
+	MOVH R1, BYTEALTO DIRECCION coordenada_y
+	MOVL R1, BYTEBAJO DIRECCION coordenada_y ; Load the address of the memory location containing the ASCII character
+	MOV R1, [R1] ; Load the ASCII character into R1
+	MOVH R5, 00
+	MOVL R5, 48
+	SUB R1, R1, R5 ; Convert ASCII character to numerical value ('0' -> 0, '1' -> 1, ..., '9' -> 9)
+	; Now R1 contains the numerical value corresponding to the number coordinate
+	
+	; Assuming fila and columna contain the numerical values of row and column respectively
+
+	; Step 1: Subtract 1 from both fila and columna
+	DEC R0
+	DEC R1
+	
+	; Initialize counter
+	MOVH R3, 0
+	MOVL R3, 15 ; Counter for the loop
+
+	XOR R4, R4, R4
+
+	; Step 2: Multiply the adjusted fila by 15 using repeated addition
+	repeat_addition:
+		; Add the adjusted fila to R2
+		ADD R4, R4, R0  ; Add fila to R2
+
+		; Check if the counter has reached 14 (for 14 iterations)
+		DEC R3
+		BRNZ repeat_addition ; Repeat the addition if counter is not zero
+
+	; At this point, R2 will hold the result of the multiplication
+		; Initialize counter
+	MOVH R3, 0
+	MOVL R3, 6 ; Counter for the loop
+	
+	XOR R6, R6, R6
+
+	; Step 2: Multiply the adjusted fila by 15 using repeated addition
+	repeat_addition2:
+		; Add the adjusted fila to R2
+		ADD R6, R6, R0  ; Add fila to R2
+
+		; Check if the counter has reached 14 (for 14 iterations)
+		DEC R3
+		BRNZ repeat_addition2 ; Repeat the addition if counter is not zero
+
+	; At this point, R2 will hold the result of the multiplication
+	
+
+	; Step 3: Add the adjusted columna
+	ADD R4, R4, R1 ; (fila - 1) * 15 + (columna - 1)
+	ADD R6, R6, R1
+
+	; Step 4: Add 19
+	MOVH R5, 00
+	MOVL R5, 20
+	ADD R4, R4, R5 ; (fila - 1) * 15 + (columna - 1) + 20
+
+	; Now, R4 contains the result of the formula (fila - 1) * 15 + (columna - 1) + 20
+	; Now, R6 contains the result of the formula (fila - 1) * 6 + (columna - 1)
+	;this was the fromula of profesor to calculate the position of the grid in the memory and in the screen using the coordinates of the user 
+
+	MOVH R0, BYTEALTO PANTALLA
+	MOVL R0, BYTEBAJO PANTALLA
+	ADD R0, R0, R4
+	
+	MOVH R2, BYTEALTO DIRECCION fila_a
+	MOVL R2, BYTEBAJO DIRECCION fila_a
+	ADD R2, R2, R6
+	MOV R2, [R2]
+	
+	;check if the user has already selected this coordinate before and ignore it 
+	MOVH R6, 00100100b
+	MOVL R6, 'o'
+	MOV R1, [R0]
+	COMP R6, R1
+	BRZ ignore
+	
+	MOVH R6, 00010010b
+	MOVL R6, 'X'
+	MOV R1, [R0]
+	COMP R6, R1
+	BRZ ignore
+	
+	
+	MOVH R1, 00h
+	MOVL R1, 1
+	COMP R1, R2
+	BRZ tocat
+	MOVH R1, 00100100b
+	MOVL R1, 'o'
+	JMP store_number_of_tries
+	
+	ignore:
+		RET
+	
+	;check if the user hit a ship or not
+	tocat:
+		MOVH R1, 00010010b
+		MOVL R1, 'X'
+		
+		MOVH R2, BYTEALTO DIRECCION found
+		MOVL R2, BYTEBAJO DIRECCION found
+		MOV R3, [R2]
+		INC R3
+		MOV [R2], R3
+
+	;this part of the code store the number of tries in the intentos_tens and intentos_units variables directly as ASCII presentation to make it easier to print them on the final screen
+	store_number_of_tries:
+		MOV [R0], R1
+		;counter increase		
+		; Load the address of 'intentos_tens' into R2
+		MOVH R2, BYTEALTO DIRECCION intentos_tens
+		MOVL R2, BYTEBAJO DIRECCION intentos_tens
+
+		; Load the address of 'intentos_units' into R3
+		MOVH R3, BYTEALTO DIRECCION intentos_units
+		MOVL R3, BYTEBAJO DIRECCION intentos_units
+
+		; Load the current ASCII representation of the tens and units digits from memory
+		MOV R4, [R2] ; Load tens digit
+		MOV R5, [R3] ; Load units digit
+
+		; Increment the units digit
+		INC R5
+		; Check if the units digit exceeds '9'
+		MOVH R6, 00h
+		MOVL R6, 3Ah ; ASCII '9'
+		COMP R5, R6
+		BRNZ store_units_digit ; If units digit is less than or equal to '9', jump to store_units_digit
+
+		; If units digit exceeds '9', reset it to '0' and increment the tens digit
+		MOVL R5, 30h ; ASCII '0'
+		MOVH R5, 0
+		MOV [R3], R5 ; Store '0' as the units digit
+		; Increment the tens digit
+		INC R4
+
+		store_units_digit:
+		; Store the updated units digit back in memory
+		MOV [R3], R5
+
+		; Store the updated tens digit back in memory
+		MOV [R2], R4
+		
+		RET
+		
+; this procedure counts the number of ships in the grid and stores the result in contador_de_ships 
+counter:
+    ; Load the address of fila_a into R1
+    MOVH R1, BYTEALTO DIRECCION fila_a
+    MOVL R1, BYTEBAJO DIRECCION fila_a
+    
+    ; Initialize R4 with the value 36
+    MOVH R4, 0h
+    MOVL R4, 36
+    
+    ; Initialize R5 with the value 1
+    MOVH R5, 0h
+    MOVL R5, 01h
+    
+    ; Clear R6 to use it as the counter for matches
+    XOR R6, R6, R6
+    
+    count:
+        ; Load the value from memory pointed by R1 into R3
+        MOV R3, [R1]
+        
+        ; Compare R3 with the desired value (R5 in this case, which is 1)
+        COMP R3, R5
+        
+        ; If R3 equals R5, increment the counter in R6
+        BRZ increment
+        INC R1
+        DEC R4
+		BRZ store
+        BRNZ count
+
+    increment:
+        ; Increment the counter in R6
+        INC R6
+        INC R1
+        DEC R4
+		BRZ store
+        BRNZ count
+
+        ; At this point, R6 contains the count of matches (36 in this case)
+        
+        ; Store the count from R6 into the address of contador_de_ships
+		store:
+			MOVH R1, BYTEALTO DIRECCION contador_de_ships
+			MOVL R1, BYTEBAJO DIRECCION contador_de_ships
+			MOV [R1], R6
+    
+    ; Return from the procedure
+    RET
+
+; this procedure checks if the user has found all the ships in the grid by comparing the number of ships found with the total number of ships in the grid
+comprovar_final:
+    ; Move the high byte of the contador_de_ships address to R1
+    MOVH R1, BYTEALTO DIRECCION contador_de_ships
+    ; Move the low byte of the contador_de_ships address to R1
+    MOVL R1, BYTEBAJO DIRECCION contador_de_ships
+    ; Move the value at the address in R1 to R2
+    MOV R2, [R1] 
+
+    ; Move the high byte of the found address to R3
+    MOVH R3, BYTEALTO DIRECCION found
+    ; Move the low byte of the found address to R3
+    MOVL R3, BYTEBAJO DIRECCION found
+    ; Move the value at the address in R3 to R4
+    MOV R4, [R3] 
+
+    ; Compare the values in R2 and R4
+    COMP R2, R4
+    ; If they are equal (zero flag is set), jump to the final label
+    BRZ final
+    ; Return from the procedure
+    RET
+
+
+final:
+    ; Move the high byte of the clean_screen address to R0
+    MOVH R0, BYTEALTO DIRECCION clean_screen 
+    ; Move the low byte of the clean_screen address to R0
+    MOVL R0, BYTEBAJO DIRECCION clean_screen
+    ; Call the function at the address in R0 (clean_screen)
+    CALL R0
+    
+    ; Use R0 to access the screen
+    MOVH R0, BYTEALTO  PANTALLA 
+    MOVL R0, BYTEBAJO  PANTALLA 
+    ; Use R2 as a counter
+    MOVH R2, 00h 
+    MOVL R2, 60
+    ; Use R3 to reference the vector to print 
+    MOVH R3, BYTEALTO DIRECCION text_final_1 
+    MOVL R3, BYTEBAJO DIRECCION text_final_1 
+    
+    imprimir_final: 
+        ; Move the value at the address in R3 to R4
+        MOV R4 , [R3] 
+        ; Read the memory value to print 
+        MOVH R4 , 00000110b ; Set the format of the text to print
+        ; Send the data to print to the screen
+        MOV [R0], R4 
+        ; Move to the next screen position 
+        INC R0 
+        ; Move to the next position of the vector 
+        INC R3 
+        ; Decrement the counter
+        DEC R2 
+        ; When the counter is 0, we have finished
+        BRNZ imprimir_final 
+    ; Jump to address -1 (infinite loop) to avoid bugs
+    JMP -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+FIN 
